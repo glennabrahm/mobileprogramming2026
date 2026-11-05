@@ -13,26 +13,29 @@ import android.widget.ListView;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Scanner;
+import android.content.DialogInterface;
 
 public class MainActivity extends AppCompatActivity {
 
     private HashMap<String, String> kamusEasy, kamusMedium, kamusDifficult, kamus;
     private ArrayList<String> kataEasy, kataMedium, kataDifficult, kata;
-    int JUMLAH_OPSI=5;
+    int JUMLAH_OPSI = 5;
+    private int JUMLAH_SOAL = 10;
+    private int soalKe = 0;
+
     private RecyclerView rvOpsi;
     private OpsiAdapter adapter;
     private TextView textHasil;
@@ -116,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onCheckedChanged(RadioGroup group, int checkedId) {
                 pilihLevel(checkedId);
-                letsPlay();
+                mulaiSesiBaru();
             }
         });
 
@@ -133,8 +136,40 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-
         letsPlay();
+    }
+
+    private String kodeLevel() {
+        int id = radioGroupLevel.getCheckedRadioButtonId();
+        if (id == R.id.radioEasy) return "Easy";
+        if (id == R.id.radioMedium) return "Medium";
+        return "Hard";
+
+    }
+    private void mulaiSesiBaru() {
+        soalKe=0;
+        skorBenar = 0;
+        skorSalah = 0;
+        letsPlay();
+    }
+
+    private void selesaiSesi() {
+        hentikanTimer();
+        sudahDijawab = true;
+        tampilkanRingkasan();
+
+    }
+
+    private void tampilkanRingkasan() {
+        int nilai = skorBenar * 100 / JUMLAH_SOAL;
+        new AlertDialog.Builder(this)
+                .setTitle("sesi selesai")
+                .setMessage("level" + kodeLevel()+"Nilai: " + nilai)
+                .setPositiveButton("Mau main lagi", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        mulaiSesiBaru();
+                    }
+                }).show();
     }
 
     private void pilihLevel(int checkedId) {
@@ -151,152 +186,169 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+
     private void letsPlay() {
-        opsiJawaban = new ArrayList<>();
-        soal = null;
-        textHasil.setText("");
 
-
-        ArrayList<String> acak = new ArrayList<>(kata);
-        Collections.shuffle(acak);
-        soal= acak.get(0);
-
-        for (int i = 0; i < JUMLAH_OPSI; i++) {
-            opsiJawaban.add(kamus.get(acak.get(i)));
+        if (soalKe >= JUMLAH_SOAL) {
+            selesaiSesi();
+            return;
         }
-        Collections.shuffle(opsiJawaban);
+            soalKe++;
+            sudahDijawab = false;
+            updateSkor();
 
-        TextView textSoal = findViewById(R.id.vocab);
-        textSoal.setText(soal);
-        // adapter.setOpsi(opsiJawaban);
-        textHasil.setText("");
-        adapter.setOpsi(opsiJawaban, opsiJawaban.indexOf(kamus.get(soal)));
+            opsiJawaban = new ArrayList<>();
+            soal = null;
+            textHasil.setText("");
 
-        sisaMs = DURASI_SOAL;
-        mulaiTimer(sisaMs);
+            ArrayList<String> acak = new ArrayList<>(kata);
+            Collections.shuffle(acak);
+            soal = acak.get(0);
 
-
-    }
-
-
-    private void periksaJawaban(int position) {
-        hentikanTimer();
-        adapter.tandaiJawaban(position);
-        String benar = kamus.get(soal);
-        String diklik = opsiJawaban.get(position);
-        if (diklik.equals(benar)) {
-            skorBenar++;
-            textHasil.setText("Benar!");
-        } else {
-            skorSalah++;
-            textHasil.setText("Salah. Jawaban benar: " + benar);
-        }
-        updateSkor();
-    }
-
-    private void readFromFile(int resourceId, HashMap<String, String> kamus, ArrayList<String> kata) {
-        Scanner scan = new Scanner(getResources().openRawResource(resourceId));
-        while (scan.hasNextLine()) {
-            String[] t = scan.nextLine().split("\t");
-            if (t.length >= 2) {
-                kamus.put(t[0].trim(), t[1].trim());
-                kata.add(t[0].trim());
+            for (int i = 0; i < JUMLAH_OPSI; i++) {
+                opsiJawaban.add(kamus.get(acak.get(i)));
             }
-        }
-        scan.close();
-    }
+            Collections.shuffle(opsiJawaban);
 
-    private void updateSkor() {
-        textSkor.setText("Benar: " + skorBenar + "  Salah: " + skorSalah);
-    }
+            TextView textSoal = findViewById(R.id.vocab);
+            textSoal.setText(soal);
+            // adapter.setOpsi(opsiJawaban);
+            textHasil.setText("");
+            adapter.setOpsi(opsiJawaban, opsiJawaban.indexOf(kamus.get(soal)));
 
-    private void mulaiTimer(long durasi) {
-        hentikanTimer();
-        timer = new CountDownTimer(durasi, 1000) {
-            @Override
-            public void onTick(long ms) {
-                sisaMs = ms;
-                textWaktu.setText((ms + 999) / 1000 + " detik");
-                Log.d(TAG_TIMER, "tick " + (ms + 999) / 1000
-                        + " dari activity " + Integer.toHexString(MainActivity.this.hashCode()));
-            }
-
-            @Override
-            public void onFinish() {
-                sisaMs = 0;
-                textWaktu.setText("0 detik");
-                waktuHabis();
-            }
-        }.start();
-    }
-
-    private void hentikanTimer() {
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
-        }
-    }
-
-    private void waktuHabis() {
-        skorSalah++;
-        updateSkor();
-        adapter.tandaiWaktuHabis();
-        textHasil.setText("Waktu habis. Jawaban benar: " + kamus.get(soal));
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        Log.d(TAG_LC, "onStart");
-    }
-
-    @Override
-    protected void onRestart() {
-        super.onRestart();
-        Log.d(TAG_LC, "onRestart");
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        Log.d(TAG_LC, "onResume");
-        if (!sudahDijawab && sisaMs > 0) {
+            sisaMs = DURASI_SOAL;
             mulaiTimer(sisaMs);
         }
+
+
+
+        private void periksaJawaban ( int position){
+
+            if (sudahDijawab) return;
+            sudahDijawab=true;
+
+            hentikanTimer();
+            adapter.tandaiJawaban(position);
+            String benar = kamus.get(soal);
+            String diklik = opsiJawaban.get(position);
+            if (diklik.equals(benar)) {
+                skorBenar++;
+                textHasil.setText("Benar!");
+            } else {
+                skorSalah++;
+                textHasil.setText("Salah. Jawaban benar: " + benar);
+            }
+            updateSkor();
+        }
+
+        private void readFromFile ( int resourceId, HashMap<
+        String, String > kamus, ArrayList < String > kata){
+            Scanner scan = new Scanner(getResources().openRawResource(resourceId));
+            while (scan.hasNextLine()) {
+                String[] t = scan.nextLine().split("\t");
+                if (t.length >= 2) {
+                    kamus.put(t[0].trim(), t[1].trim());
+                    kata.add(t[0].trim());
+                }
+            }
+            scan.close();
+        }
+
+        private void updateSkor () {
+            textSkor.setText("Soal no: "+ soalKe +"Benar:" + skorBenar + "  Salah: " + skorSalah);
+        }
+
+        private void mulaiTimer ( long durasi){
+            hentikanTimer();
+            timer = new CountDownTimer(durasi, 1000) {
+                @Override
+                public void onTick(long ms) {
+                    sisaMs = ms;
+                    textWaktu.setText((ms + 999) / 1000 + " detik");
+                    Log.d(TAG_TIMER, "tick " + (ms + 999) / 1000
+                            + " dari activity " + Integer.toHexString(MainActivity.this.hashCode()));
+                }
+
+                @Override
+                public void onFinish() {
+                    sisaMs = 0;
+                    textWaktu.setText("0 detik");
+                    waktuHabis();
+                }
+            }.start();
+        }
+
+        private void hentikanTimer () {
+            if (timer != null) {
+                timer.cancel();
+                timer = null;
+            }
+        }
+
+        private void waktuHabis () {
+            if(sudahDijawab) return;
+            sudahDijawab=true;
+
+            skorSalah++;
+            updateSkor();
+            adapter.tandaiWaktuHabis();
+            textHasil.setText("Waktu habis. Jawaban benar: " + kamus.get(soal));
+        }
+
+        @Override
+        protected void onStart () {
+            super.onStart();
+            Log.d(TAG_LC, "onStart");
+        }
+
+        @Override
+        protected void onRestart () {
+            super.onRestart();
+            Log.d(TAG_LC, "onRestart");
+        }
+
+        @Override
+        protected void onResume () {
+            super.onResume();
+            Log.d(TAG_LC, "onResume");
+            if (!sudahDijawab && sisaMs > 0) {
+                mulaiTimer(sisaMs);
+            }
+        }
+
+        @Override
+        protected void onPause () {
+            super.onPause();
+            Log.d(TAG_LC, "onPause");
+            hentikanTimer();
+        }
+
+        @Override
+        protected void onStop () {
+            super.onStop();
+            Log.d(TAG_LC, "onStop");
+        }
+
+        @Override
+        protected void onDestroy () {
+            super.onDestroy();
+            Log.d(TAG_LC, "onDestroy, isFinishing=" + isFinishing()
+                    + ", isChangingConfigurations=" + isChangingConfigurations());
+        }
+
+        @Override
+        protected void onSaveInstanceState (@NonNull Bundle outState){
+            super.onSaveInstanceState(outState);
+            outState.putInt(KEY_SKOR_BENAR, skorBenar);
+            outState.putInt(KEY_SKOR_SALAH, skorSalah);
+
+            outState.putString(KEY_SOAL, soal);
+            outState.putStringArrayList(KEY_OPSI, opsiJawaban);
+            outState.putLong(KEY_SISA_MS, sisaMs);
+            outState.putInt(KEY_LEVEL, radioGroupLevel.getCheckedRadioButtonId());
+            Log.d(TAG_LC, "onSaveInstanceState, skor=" + skorBenar + "/" + skorSalah
+                    + radioGroupLevel.getCheckedRadioButtonId());
+        }
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        Log.d(TAG_LC, "onPause");
-        hentikanTimer();
-    }
 
-    @Override
-    protected void onStop() {
-        super.onStop();
-        Log.d(TAG_LC, "onStop");
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        Log.d(TAG_LC, "onDestroy, isFinishing=" + isFinishing()
-                + ", isChangingConfigurations=" + isChangingConfigurations());
-    }
-
-    @Override
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putInt(KEY_SKOR_BENAR, skorBenar);
-        outState.putInt(KEY_SKOR_SALAH, skorSalah);
-
-        outState.putString(KEY_SOAL, soal);
-        outState.putStringArrayList(KEY_OPSI, opsiJawaban);
-        outState.putLong(KEY_SISA_MS, sisaMs);
-        outState.putInt(KEY_LEVEL, radioGroupLevel.getCheckedRadioButtonId() );
-        Log.d(TAG_LC, "onSaveInstanceState, skor=" + skorBenar + "/" + skorSalah
-        + radioGroupLevel.getCheckedRadioButtonId());
-    }
-
-}
